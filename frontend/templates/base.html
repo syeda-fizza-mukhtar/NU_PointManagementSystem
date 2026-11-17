@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}FAST Transport{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='4') }}">
+</head>
+<body class="{{ session.user.role if session.user else 'guest' }}">
+  {% if session.user %}
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="{{ url_for('web.dashboard') }}"><span class="brand-mark">FT</span><span class="brand-name">FAST Transport<small>OPERATIONS PORTAL</small></span></a>
+      <div class="sidebar-section">Workspace</div>
+      <nav class="sidebar-nav" aria-label="Main navigation">
+        <a class="side-link {{ 'active' if request.endpoint == 'web.dashboard' else '' }}" href="{{ url_for('web.dashboard') }}">Overview</a>
+        <a class="side-link {{ 'active' if request.endpoint == 'web.route_explorer' else '' }}" href="{{ url_for('web.route_explorer') }}">Route explorer</a>
+      </nav>
+      {% if session.user.role == 'admin' %}
+      <div class="sidebar-section">Administration</div>
+      <nav class="sidebar-nav" aria-label="Administration">
+        <a class="side-link {{ 'active' if request.endpoint == 'web.admin_records' and request.view_args.get('category') == 'semesters' else '' }}" href="{{ url_for('web.admin_records', category='semesters') }}">Semesters</a>
+        <a class="side-link {{ 'active' if request.endpoint == 'web.admin_records' and request.view_args.get('category') == 'users' else '' }}" href="{{ url_for('web.admin_records', category='users') }}">Users</a>
+        <a class="side-link {{ 'active' if request.endpoint == 'web.admin_records' and request.view_args.get('category') == 'providers' else '' }}" href="{{ url_for('web.admin_records', category='providers') }}">Providers</a>
+        <a class="side-link {{ 'active' if request.endpoint == 'web.admin_records' and request.view_args.get('category') == 'drivers' else '' }}" href="{{ url_for('web.admin_records', category='drivers') }}">Drivers</a>
+        <a class="side-link {{ 'active' if request.endpoint == 'web.admin_records' and request.view_args.get('category') == 'routes' else '' }}" href="{{ url_for('web.admin_records', category='routes') }}">Routes</a>
+        <a class="side-link {{ 'active' if request.endpoint == 'web.admin_records' and request.view_args.get('category') == 'vehicles' else '' }}" href="{{ url_for('web.admin_records', category='vehicles') }}">Vehicles</a>
+        <a class="side-link {{ 'active' if request.endpoint == 'web.admin_records' and request.view_args.get('category') == 'bookings' else '' }}" href="{{ url_for('web.admin_records', category='bookings') }}">Bookings</a>
+        <a class="side-link {{ 'active' if request.endpoint == 'web.admin_records' and request.view_args.get('category') == 'payments' else '' }}" href="{{ url_for('web.admin_records', category='payments') }}">Payments</a>
+        <a class="side-link {{ 'active' if request.endpoint == 'web.admin_records' and request.view_args.get('category') == 'waitlists' else '' }}" href="{{ url_for('web.admin_records', category='waitlists') }}">Waitlists</a>
+        <a class="side-link {{ 'active' if request.endpoint == 'web.booking_report' else '' }}" href="{{ url_for('web.booking_report') }}">Reports</a>
+      </nav>
+      {% endif %}
+      <div class="sidebar-footer">
+        <div class="account-name">{{ session.user.name }}</div>
+        <div class="account-role">{{ session.user.role | title }} account</div>
+        <a href="{{ url_for('web.logout') }}">Sign out</a>
+      </div>
+    </aside>
+    <div class="app-main">
+      <header class="app-header">
+        <div><span class="header-kicker">FAST NUCES</span><span class="header-divider">/</span>{{ session.user.role | title }} workspace</div>
+        <span class="header-status">Transport management</span>
+      </header>
+  {% endif %}
+  <main class="{{ 'shell' if session.user else 'guest-shell' }}">
+    {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}{% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+  {% if session.user %}</div></div>{% endif %}
+</body>
+</html>

@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% from '_csrf.html' import csrf_field with context %}
+{% block title %}{{ user.role | title }} dashboard · FAST Transport{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <div class="eyebrow">{{ user.role }} portal</div>
+    <h1>Good day, {{ user.name.split(' ')[0] }}.</h1>
+    <p>{% if semester %}{{ semester.name }} · {{ semester.starts }} to {{ semester.ends }}{% else %}No semester is active. Ask an administrator to create one.{% endif %}</p>
+  </div>
+  <div class="semester-pill">{{ semester.name if semester else 'Setup required' }}</div>
+</section>
+
+{% if user.role == 'admin' %}
+{% if not semester %}
+<section class="setup-notice">
+  <div class="setup-step">01</div>
+  <div class="setup-copy">
+    <span class="eyebrow">Getting started</span>
+    <h2>Configure your first semester</h2>
+    <p>Set the dates, fares, and seat allocation first. Then add providers, routes, vehicles, drivers, and member accounts.</p>
+  </div>
+  <a class="button-link" href="{{ url_for('web.admin_records', category='semesters') }}">Configure semester</a>
+</section>
+{% endif %}
+<section class="stat-grid">
+  {% for label, value in stats.items() %}
+  <article class="stat-card">
+    <small>{{ label | replace('_', ' ') | title }}</small><strong>{{ value }}</strong>
+    <span>{% if label == 'users' %}Registered accounts{% elif label == 'vehicles' %}Active semester fleet{% elif label == 'bookings' %}Active reservations{% else %}Current semester{% endif %}</span>
+  </article>
+  {% endfor %}
+</section>
+<section class="section-head"><h2>Manage transport records</h2><p>Create, update, and remove master records on their dedicated pages. Booking, payment, and audit history is retained.</p></section>
+<nav class="record-links">{% for category in record_categories %}<a href="{{ url_for('web.admin_records', category=category) }}">{{ category | replace('_', ' ') | title }}</a>{% endfor %}<a class="highlight" href="{{ url_for('web.booking_report') }}">Current semester report</a></nav>
+{% if semester %}
+<section class="section-head"><h2>Active semester fleet</h2><p>Open each vehicle's confirmed passenger manifest.</p></section>
+<div class="card table-card"><table><thead><tr><th>Vehicle</th><th>Registration</th><th>Route</th><th>Driver</th><th>Capacity</th><th></th></tr></thead><tbody>
+  {% for vehicle in vehicles %}<tr><td>{{ vehicle.id }}</td><td>{{ vehicle.registration }}</td><td>{{ vehicle.route.start }} → {{ vehicle.route.end }}</td><td>{{ vehicle.driver_id or 'Unassigned' }}</td><td>{{ vehicle.capacity }}</td><td><a href="{{ url_for('web.passenger_list', vehicle_id=vehicle.id) }}">Passengers</a></td></tr>
+  {% else %}<tr><td colspan="6">No vehicles configured for this semester.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endif %}
+
+{% elif user.role in ['student', 'faculty'] %}
+<section class="section-head"><h2>Available rides</h2><p>Record the vehicle fare payment before selecting an eligible seat.</p></section>
+<section class="ride-grid">
+  {% for vehicle in vehicles %}
+  <article class="ride-card">
+    <div class="ride-top"><span class="vehicle-type">{{ vehicle.type }}</span><span class="tag {{ 'ac' if vehicle.ac else '' }}">{{ 'AC' if vehicle.ac else 'Standard' }}</span></div>
+    <h3>{{ vehicle.id }} <small>{{ vehicle.registration }}</small></h3>
+    <div class="route-line">{{ vehicle.route.start }} → {{ vehicle.route.end }} · {{ vehicle.route.distance }} km</div>
+    <div class="ride-meta"><span>{{ vehicle.seats | length }} eligible seats</span><strong>Rs. {{ '%.2f'|format(vehicle.fare) }}</strong></div>
+    <div class="seat-list">Available: {{ vehicle.seats | join(', ') if vehicle.seats else 'No eligible seats' }}</div>
+    {% if vehicle.offered_seat %}<div class="offer-notice">Seat {{ vehicle.offered_seat }} has been offered to you. Confirm it below.</div>{% endif %}
+    {% if vehicle.paid %}
+    <div class="payment-confirmed">Semester payment recorded</div>
+    {% elif not active_booking %}
+    <form method="post" action="{{ url_for('web.payment') }}">{{ csrf_field() }}<input type="hidden" name="vehicle_id" value="{{ vehicle.id }}"><button>Record full payment</button></form>
+    {% endif %}
+    {% if active_booking %}
+    <div class="inline-note">Active booking {{ active_booking.id }} for vehicle {{ active_booking.vehicle_id }}. Cancel it before reserving another seat.</div>
+    {% elif vehicle.paid and (vehicle.seats or vehicle.offered_seat) %}
+    <form method="post" action="{{ url_for('web.book') }}" class="inline-form">{{ csrf_field() }}<input type="hidden" name="vehicle_id" value="{{ vehicle.id }}">
+      <select name="seat" required><option value="">Choose seat</option>{% if vehicle.offered_seat %}<option value="{{ vehicle.offered_seat }}">Seat {{ vehicle.offered_seat }} · offered</option>{% endif %}{% for seat in vehicle.seats %}<option value="{{ seat }}">Seat {{ seat }}</option>{% endfor %}</select><button class="primary">Confirm seat</button>
+    </form>
+    {% elif vehicle.paid and vehicle.waitlist_status == 'waiting' %}
+    <div class="inline-note">You are on this vehicle's waiting list.</div>
+    {% elif vehicle.paid %}
+    <form method="post" action="{{ url_for('web.join_waitlist') }}">{{ csrf_field() }}<input type="hidden" name="vehicle_id" value="{{ vehicle.id }}"><button>Join waiting list</button></form>
+    {% else %}
+    <div class="inline-note">Record the full payment to book or join the waiting list.</div>
+    {% endif %}
+  </article>
+  {% else %}<p>No vehicles have been added for this semester.</p>{% endfor %}
+</section>
+<section class="section-head"><h2>My bookings across semesters</h2></section>
+<div class="card table-card"><table><thead><tr><th>Semester</th><th>Booking</th><th>Vehicle</th><th>Seat</th><th>Fare</th><th>Status</th><th></th></tr></thead><tbody>
+  {% for booking in bookings %}<tr><td>{{ booking.semester_id }}</td><td>{{ booking.id }}</td><td>{{ booking.vehicle_id }}</td><td>{{ booking.seat }}</td><td>Rs. {{ '%.2f'|format(booking.fare) }}</td><td><span class="status {{ booking.status }}">{{ booking.status }}</span></td><td>{% if booking.status == 'confirmed' and booking.semester_id == semester.id %}<form method="post" action="{{ url_for('web.cancel', booking_id=booking.id) }}">{{ csrf_field() }}<button class="danger">Cancel</button></form>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="7">No bookings yet.</td></tr>{% endfor %}
+</tbody></table></div>
+<section class="section-head"><h2>My payments</h2></section>
+<div class="card table-card"><table><thead><tr><th>Semester</th><th>Payment</th><th>Vehicle</th><th>Amount</th><th>Status</th><th>Paid at</th></tr></thead><tbody>
+  {% for payment in payments %}<tr><td>{{ payment.semester_id }}</td><td>{{ payment.id }}</td><td>{{ payment.vehicle_id }}</td><td>Rs. {{ '%.2f'|format(payment.amount) }}</td><td>{{ payment.status }}</td><td>{{ payment.paid_at }}</td></tr>
+  {% else %}<tr><td colspan="6">No payments yet.</td></tr>{% endfor %}
+</tbody></table></div>
+<section class="section-head"><h2>Waiting lists</h2></section>
+<div class="card table-card"><table><thead><tr><th>Semester</th><th>Vehicle</th><th>Status</th><th>Offered seat</th><th></th></tr></thead><tbody>
+  {% for item in waitlists %}<tr><td>{{ item.semester_id }}</td><td>{{ item.vehicle_id }}</td><td>{{ item.status }}</td><td>{{ item.get('offered_seat', '—') }}</td><td>{% if semester and item.semester_id == semester.id and item.status in ['waiting', 'offered'] %}<form method="post" action="{{ url_for('web.leave_waitlist', entry_id=item.id) }}">{{ csrf_field() }}<button class="danger">Leave list</button></form>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="5">No waiting-list entries.</td></tr>{% endfor %}
+</tbody></table></div>
+
+{% else %}
+<section class="section-head"><h2>{% if user.role == 'driver' %}Assigned vehicles{% else %}Your active fleet{% endif %}</h2><p>Current-semester operations and confirmed passengers.</p></section>
+<section class="ride-grid">
+  {% for vehicle in vehicles %}
+  <article class="ride-card"><span class="vehicle-type">{{ vehicle.type }}</span><h3>{{ vehicle.id }} <small>{{ vehicle.registration }}</small></h3>
+    <div class="route-line">{{ vehicle.route.start }} → {{ vehicle.route.end }} · {{ vehicle.route.distance }} km</div>
+    <div class="ride-meta"><span>Driver {{ vehicle.driver_id or 'unassigned' }}</span><strong>{{ vehicle.capacity }} seats</strong></div>
+    <a class="button-link" href="{{ url_for('web.passenger_list', vehicle_id=vehicle.id) }}">View confirmed passenger list</a>
+  </article>
+  {% else %}<p>No current-semester vehicle assignments.</p>{% endfor %}
+</section>
+<section class="section-head"><h2>Confirmed passengers</h2></section>
+<div class="card table-card"><table><thead><tr><th>Booking</th><th>Passenger</th><th>Vehicle</th><th>Seat</th><th>Booked at</th></tr></thead><tbody>
+  {% for booking in bookings %}<tr><td>{{ booking.id }}</td><td>{{ booking.passenger_name }}</td><td>{{ booking.vehicle_id }}</td><td>{{ booking.seat }}</td><td>{{ booking.booked_at }}</td></tr>
+  {% else %}<tr><td colspan="5">No confirmed passengers yet.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endif %}
+{% endblock %}

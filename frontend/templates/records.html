@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% from '_csrf.html' import csrf_field with context %}
+{% block title %}{{ category | title }} · FAST Transport{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <div class="eyebrow">Administrator records</div>
+    <h1>{{ category | replace('_', ' ') | title }}</h1>
+    <p>{{ description or 'Saved transport records and history.' }}</p>
+  </div>
+  <a class="button-link" href="{{ url_for('web.dashboard') }}">Back to dashboard</a>
+</section>
+
+{% if create_fields %}
+<section class="card record-editor">
+  <h2>Add {{ category[:-1] | replace('_', ' ') }}</h2>
+  {% if no_active_semester %}
+    <div class="locked-panel">Activate a semester before adding active-semester records. <a href="{{ url_for('web.admin_records', category='semesters') }}">Manage semesters</a></div>
+  {% elif category == 'vehicles' and (not create_fields[3].options or not create_fields[4].options) %}
+    <div class="locked-panel">Add an active-semester route and a transport provider before adding vehicles. <a href="{{ url_for('web.admin_records', category='routes') }}">Manage routes</a> · <a href="{{ url_for('web.admin_records', category='providers') }}">Manage providers</a></div>
+  {% else %}
+  <form method="post" action="{{ url_for(create_endpoint) }}" class="form-grid record-form">
+    {{ csrf_field() }}
+    {% for field in create_fields %}
+      {% if field.type == 'select' %}
+        <label>{{ field.label }}<select name="{{ field.name }}" {% if field.required is not defined or field.required %}required{% endif %}>
+          <option value="">Select {{ field.label | lower }}</option>
+          {% for value, label in field.options %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select></label>
+      {% elif field.type == 'checkbox' %}
+        <label class="check"><input type="checkbox" name="{{ field.name }}" value="on"> {{ field.label }}</label>
+      {% else %}
+        <label>{{ field.label }}<input name="{{ field.name }}" type="{{ field.type or 'text' }}" placeholder="{{ field.placeholder or '' }}" {% if field.min is defined %}min="{{ field.min }}"{% endif %} {% if field.max is defined %}max="{{ field.max }}"{% endif %} {% if field.step is defined %}step="{{ field.step }}"{% endif %} {% if field.value is defined %}value="{{ field.value }}"{% endif %} {% if field.required is not defined or field.required %}required{% endif %}></label>
+      {% endif %}
+    {% endfor %}
+    <button class="primary">Add {{ category[:-1] | replace('_', ' ') }}</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if searchable %}
+<form class="card record-search" method="get" action="{{ url_for('web.admin_records', category=category) }}">
+  <label for="record-id">Find a record by ID</label>
+  <input id="record-id" name="q" value="{{ search_query }}" placeholder="Enter exact record ID">
+  <button class="primary">Search</button>
+  {% if search_query %}<a href="{{ url_for('web.admin_records', category=category) }}">Clear</a>{% endif %}
+</form>
+{% endif %}
+
+<div class="card table-card">
+  <table>
+    <thead><tr>{% for column in columns %}<th>{{ column | replace('_', ' ') | title }}</th>{% endfor %}{% if editable or can_cancel_bookings %}<th>Actions</th>{% endif %}</tr></thead>
+    <tbody>
+      {% for record in records %}
+      <tr>
+        {% for column in columns %}
+          {% set value = record.get(column, '') %}
+          <td>{% if value is sameas true %}Yes{% elif value is sameas false %}No{% elif value is sequence and value is not string %}{{ value | join(' · ') }}{% else %}{{ value }}{% endif %}</td>
+        {% endfor %}
+        {% if editable %}
+        <td class="record-actions">
+          <details>
+            <summary>Edit</summary>
+            <form method="post" action="{{ url_for('web.update_admin_record', category=category, record_id=record.id) }}" class="form-grid record-form">
+              {{ csrf_field() }}
+              {% for field in update_fields %}
+                {% if field.type == 'select' %}
+                  <label>{{ field.label }}<select name="{{ field.name }}" {% if field.required is not defined or field.required %}required{% endif %}>
+                    {% for value, label in field.options %}<option value="{{ value }}" {% if record.get(field.name, '') | string == value | string %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                  </select></label>
+                {% elif field.type == 'checkbox' %}
+                  <label class="check"><input type="checkbox" name="{{ field.name }}" value="on" {% if record.get(field.name) %}checked{% endif %}> {{ field.label }}</label>
+                {% else %}
+                  <label>{{ field.label }}<input name="{{ field.name }}" type="{{ field.type or 'text' }}" value="{{ record.get(field.name, '') }}" placeholder="{{ field.label }}" {% if field.min is defined %}min="{{ field.min }}"{% endif %} {% if field.max is defined %}max="{{ field.max }}"{% endif %} {% if field.step is defined %}step="{{ field.step }}"{% endif %} {% if field.required is not defined or field.required %}required{% endif %}></label>
+                {% endif %}
+              {% endfor %}
+              <button class="primary">Save changes</button>
+            </form>
+          </details>
+          {% if category == 'semesters' and not record.active %}
+            <form method="post" action="{{ url_for('web.activate_semester', semester_id=record.id) }}">{{ csrf_field() }}<button>Activate</button></form>
+          {% endif %}
+          {% if category != 'semesters' or not record.active %}
+            <form method="post" action="{{ url_for('web.delete_admin_record', category=category, record_id=record.id) }}">{{ csrf_field() }}<button class="danger">Delete</button></form>
+          {% else %}
+            <span class="inline-note">Activate another semester before deleting this one.</span>
+          {% endif %}
+        </td>
+        {% elif can_cancel_bookings %}
+        <td>{% if record.status == 'confirmed' and record.semester_id == active_semester_id %}
+          <form method="post" action="{{ url_for('web.admin_cancel_booking', booking_id=record.id) }}">{{ csrf_field() }}<button class="danger">Cancel booking</button></form>
+        {% else %}{{ record.status | title }}{% endif %}</td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr><td colspan="{{ columns | length + (1 if editable or can_cancel_bookings else 0) }}">No records found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if category in ['bookings', 'payments', 'waitlists', 'audit_log'] %}
+<p class="inline-note">Operational and audit history is retained for data integrity and cannot be hard-deleted here.</p>
+{% endif %}
+{% endblock %}

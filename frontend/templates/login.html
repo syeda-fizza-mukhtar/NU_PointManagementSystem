@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% from '_csrf.html' import csrf_field with context %}
+{% block title %}{{ 'Administrator sign in' if admin_only else 'Sign in' }} · FAST Transport{% endblock %}
+{% block content %}
+<section class="login-layout">
+  <div class="hero">
+    <div class="eyebrow">FAST-NUCES</div>
+    <h1>Your campus journey,<br><em>in one place.</em></h1>
+    <p>{% if admin_only %}Manage semester transport operations and records through the administrator portal.{% else %}Manage semester transport, fares, seats, and routes through your role-based portal.{% endif %}</p>
+    <div class="chips"><span>Semester based</span><span>Live availability</span><span>Route intelligence</span></div>
+  </div>
+  <form class="card login-card" method="post" action="{{ url_for('web.admin_login') if admin_only else url_for('web.login') }}">
+    {{ csrf_field() }}
+    <div class="logo">F</div>
+    <h2>{{ 'Administrator access' if admin_only else 'Welcome back' }}</h2>
+    <p>{{ 'Sign in to manage transport operations.' if admin_only else 'Choose your portal to continue.' }}</p>
+    {% if admin_only %}
+      <input type="hidden" name="role" value="admin">
+      <label>Administrator password <input name="password" type="password" required placeholder="Enter administrator password" autocomplete="current-password"></label>
+      <button class="primary">Sign in <span>→</span></button>
+      <a class="button-link" href="{{ url_for('web.login') }}">Member and staff sign in</a>
+    {% else %}
+      <label>Portal<select name="role" required><option value="student">Student</option><option value="faculty">Faculty</option><option value="driver">Driver</option><option value="provider">Transport provider</option></select></label>
+      <label>User ID <input name="user_id" required placeholder="Enter your account ID" autocomplete="username"></label>
+      <label>Password <input name="password" type="password" required placeholder="Enter your password" autocomplete="current-password"></label>
+      <button class="primary">Sign in <span>→</span></button>
+      <a class="button-link" href="{{ url_for('web.admin_login') }}">Administrator sign in</a>
+    {% endif %}
+  </form>
+</section>
+{% endblock %}

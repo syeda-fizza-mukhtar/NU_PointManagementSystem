@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% from '_csrf.html' import csrf_field with context %}
+{% block title %}Route explorer · FAST Transport{% endblock %}
+{% block content %}
+<section class="page-head"><div><div class="eyebrow">Route intelligence</div><h1>Explore connected stops</h1><p>Find a shortest route or inspect reachable stops using BFS and DFS.</p></div><a class="button-link" href="{{ url_for('web.dashboard') }}">Back to dashboard</a></section>
+<form class="card route-form" method="post">{{ csrf_field() }}
+  <label>Starting stop<input name="start" placeholder="e.g. Gulberg" required></label>
+  <label>Destination <span>(leave blank to explore)</span><input name="end" placeholder="e.g. FAST"></label>
+  <button class="primary">Explore routes</button>
+</form>
+{% if result %}
+<section class="card route-result">
+  {% if result.kind == 'shortest' %}
+    {% if result.path %}<h2>Shortest connected route</h2><p class="route-path">{{ result.path | join(' → ') }}</p><strong>{{ '%.2f'|format(result.distance) }} km</strong>
+    {% else %}<h2>No connected path found</h2><p>Check the stop names or choose another destination.</p>{% endif %}
+  {% else %}
+    <h2>Reachable stops</h2><p><b>Breadth-first:</b> {{ result.bfs | join(' → ') }}</p><p><b>Depth-first:</b> {{ result.dfs | join(' → ') }}</p>
+  {% endif %}
+</section>
+{% endif %}
+<section class="section-head"><h2>Connected route networks</h2><p>Stops in each group are connected through one or more active routes.</p></section>
+<div class="network-list">{% for network in networks %}<article class="card"><span class="vehicle-type">Network {{ loop.index }}</span><p>{{ network | join(' · ') }}</p></article>{% else %}<p>No connected networks have been configured.</p>{% endfor %}</div>
+<section class="section-head"><h2>Active semester routes</h2></section>
+<section class="ride-grid">{% for route in routes %}<article class="ride-card"><span class="vehicle-type">{{ route.id }}</span><h3>{{ route.start }} → {{ route.end }}</h3><div class="route-line">{{ route.stops | join(' · ') if route.stops else 'No intermediate stops' }}</div><div class="ride-meta"><span>Distance</span><strong>{{ route.distance }} km</strong></div></article>{% else %}<p>No routes are configured for the active semester.</p>{% endfor %}</section>
+{% endblock %}

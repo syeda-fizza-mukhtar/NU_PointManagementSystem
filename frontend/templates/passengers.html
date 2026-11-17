@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Passengers · FAST Transport{% endblock %}
+{% block content %}
+<section class="page-head"><div><div class="eyebrow">Vehicle {{ vehicle.id }}</div><h1>Confirmed passengers</h1><p>{{ vehicle.registration }} · Route {{ vehicle.route_id }}</p></div><a class="button-link" href="{{ url_for('web.dashboard') }}">Back to dashboard</a></section>
+<div class="card table-card"><table><thead><tr><th>Seat</th><th>Name</th><th>User ID</th><th>Booking</th></tr></thead><tbody>
+  {% for passenger in passengers %}<tr><td>{{ passenger.seat }}</td><td>{{ passenger.name }}</td><td>{{ passenger.user_id }}</td><td>{{ passenger.booking_id }}</td></tr>
+  {% else %}<tr><td colspan="4">No confirmed passengers for this vehicle.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}
